@@ -14,6 +14,7 @@ import (
 	"github.com/samber/lo"
 	"gorm.io/driver/sqlserver"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var dbStructure database.DBStructure
@@ -24,9 +25,9 @@ func init() {
 	dbStructure = database.New(db)
 
 	var tripItems schemax.TripItems
-	db.Debug().Preload("Flight").Find(&tripItems, "TAI_ID = ?", 3874)
-	// db.Debug().Preload(clause.Associations).Find(&tripItems, "TAI_ID = ?", 3874)
-	println(tripItems.Flight[0].FlId)
+	// db.Debug().Preload("Flight").Find(&tripItems, "TAI_ID = ?", 3874)
+	db.Debug().Preload(clause.Associations).Find(&tripItems, "TAI_ID = ?", 3876)
+	println(tripItems.Hotel[0].HotelName)
 }
 
 func main() {
@@ -37,7 +38,7 @@ func main() {
 	// })
 
 	// lo.ForEach([]string{"TRIP_ITEMS", "HOTEL", "FLIGHT", "CAR", "TRAIN"}, func(t string, i int) {
-	// lo.ForEach([]string{"TRIP_ITEMS"}, func(t string, i int) {
+	// 	// lo.ForEach([]string{"TRIP_ITEMS", "FLIGHT"}, func(t string, i int) {
 	// 	schema := genSchema(t)
 	// 	createFile(fmt.Sprintf("./schemax/%s.go", strings.ToLower(t)), schema)
 	// })
@@ -64,15 +65,22 @@ func genSchema(name string) []string {
 
 	fk := dbStructure.GetFK(name)
 	lo.ForEach(fk, func(t database.FK, i int) {
-		schema = append(schema, fmt.Sprintf("	%sId int64 \n", toCamelCase(t.FKTABLE_NAME)))
-		schema = append(schema, fmt.Sprintf("	%s %s `gorm:\"foreignKey:%sId\"`\n", toCamelCase(t.FKTABLE_NAME), toCamelCase(t.FKTABLE_NAME), toCamelCase(t.FKTABLE_NAME)))
+		schema = append(schema, fmt.Sprintf("	%s []%s `gorm:\"foreignKey:%s;references:%s\"`\n",
+			toCamelCase(t.FKTABLE_NAME),
+			toCamelCase(t.FKTABLE_NAME),
+			toCamelCase(t.PKCOLUMN_NAME),
+			toCamelCase(t.PKCOLUMN_NAME)))
 	})
 
 	for _, s := range schema {
 		fmt.Println(s)
 	}
 
-	schema = append(schema, "}")
+	schema = append(schema, "}\n")
+
+	schema = append(schema, fmt.Sprintf("func (%s) TableName() string {\n", toCamelCase(name)))
+	schema = append(schema, fmt.Sprintf("	return \"%s\"\n", name))
+	schema = append(schema, "}\n")
 
 	return schema
 }
