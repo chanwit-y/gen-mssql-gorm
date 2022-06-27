@@ -9,6 +9,7 @@ import (
 
 	"github.com/chanwit-y/gen-mssql-gorm.git/pkg/database"
 	"github.com/chanwit-y/gen-mssql-gorm.git/pkg/env"
+	"github.com/chanwit-y/gen-mssql-gorm.git/schemax"
 
 	"github.com/samber/lo"
 	"gorm.io/driver/sqlserver"
@@ -22,9 +23,10 @@ func init() {
 	db, _ := gorm.Open(sqlserver.Open(dsn))
 	dbStructure = database.New(db)
 
-	// var tripItems schemax.TripItems
-	// db.First(&tripItems)
-	// println(tripItems.CountryCode)
+	var tripItems schemax.TripItems
+	db.Debug().Preload("Flight").Find(&tripItems, "TAI_ID = ?", 3874)
+	// db.Debug().Preload(clause.Associations).Find(&tripItems, "TAI_ID = ?", 3874)
+	println(tripItems.Flight[0].FlId)
 }
 
 func main() {
@@ -34,15 +36,20 @@ func main() {
 	// 	fmt.Println(detail)
 	// })
 
-	schema := genSchema("TRIP_ITEMS")
-	createFile(fmt.Sprintf("./schemax/%s.go", strings.ToLower("TRIP_ITEMS")), schema)
+	// lo.ForEach([]string{"TRIP_ITEMS", "HOTEL", "FLIGHT", "CAR", "TRAIN"}, func(t string, i int) {
+	// lo.ForEach([]string{"TRIP_ITEMS"}, func(t string, i int) {
+	// 	schema := genSchema(t)
+	// 	createFile(fmt.Sprintf("./schemax/%s.go", strings.ToLower(t)), schema)
+	// })
 
 }
 
 func genSchema(name string) []string {
+	const packageName = "schemax"
+
 	var schema []string
 
-	schema = append(schema, "package schemax\n")
+	schema = append(schema, fmt.Sprintf("package %s\n", packageName))
 	schema = append(schema, fmt.Sprintf("type %s struct {\n", toCamelCase(name)))
 
 	pks := dbStructure.GetPrimaryKey(name)
@@ -55,12 +62,15 @@ func genSchema(name string) []string {
 		schema = append(schema, fmt.Sprintf("	%s %s `gorm:\"column:%s;type:%s;%s\"`\n", colName, dataType, t.ColumnName, t.DataType, pk))
 	})
 
+	fk := dbStructure.GetFK(name)
+	lo.ForEach(fk, func(t database.FK, i int) {
+		schema = append(schema, fmt.Sprintf("	%sId int64 \n", toCamelCase(t.FKTABLE_NAME)))
+		schema = append(schema, fmt.Sprintf("	%s %s `gorm:\"foreignKey:%sId\"`\n", toCamelCase(t.FKTABLE_NAME), toCamelCase(t.FKTABLE_NAME), toCamelCase(t.FKTABLE_NAME)))
+	})
+
 	for _, s := range schema {
 		fmt.Println(s)
 	}
-
-	fk := dbStructure.GetFK(name)
-	fmt.Println(fk)
 
 	schema = append(schema, "}")
 
