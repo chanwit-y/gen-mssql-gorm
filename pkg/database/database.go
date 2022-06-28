@@ -26,7 +26,7 @@ type FK struct {
 }
 
 type Constraint struct {
-	Name           string
+	ConstraintName string
 	ConstraintType string
 }
 
@@ -87,7 +87,17 @@ func (d DBStructure) GetConstraints(name string) []Constraint {
 	var result []Constraint
 	d.db.Raw(fmt.Sprintf(`SELECT CONSTRAINT_NAME AS ConstraintName
 			,CONSTRAINT_TYPE AS Constrainttype 
-			FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS where TABLE_NAME = '%s'`, name))
+			FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS where TABLE_NAME = '%s' 
+			AND CONSTRAINT_TYPE = 'FOREIGN KEY'`, name)).Scan(&result)
+
+	return result
+}
+
+func (d DBStructure) GetUniqueConstraintName(constraintName string) []string {
+	var result []string
+	d.db.Raw(fmt.Sprintf(`SELECT UNIQUE_CONSTRAINT_NAME
+	FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS 
+	WHERE CONSTRAINT_NAME = '%s'`, constraintName)).Scan(&result)
 
 	return result
 }
